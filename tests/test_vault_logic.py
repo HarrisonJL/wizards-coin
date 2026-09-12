@@ -165,6 +165,43 @@ def test_expire_after_timeout_refunds_owner_and_closes(direct_vm, direct_deploy,
     assert state["prize_pool"] == 0
 
 
+def test_sweep_reconciles_untracked_balance(direct_vm, direct_deploy, direct_owner, direct_alice):
+    vault = _deploy(direct_vm, direct_deploy, direct_owner)
+    direct_vm.mock_llm("guardian", DENY)
+
+    direct_vm.sender = direct_alice
+    direct_vm.value = ONE_GEN
+    vault.attempt("first try")
+
+    pool_before = vault.get_state()["prize_pool"]
+    creator_share = ONE_GEN * 3000 // 10000
+    tracked_before = pool_before + creator_share
+
+    # Simulate a stray/untracked balance landing on the contract - matching
+    # how a real validator-timeout attempt leaves its fee in the contract's
+    # actual balance without ever reaching attempt()'s own bookkeeping.
+    # deal() sets the simulated balance directly, bypassing any tracked
+    # method, the same way the real stuck funds bypassed ours.
+    stray = ONE_GEN // 10
+    direct_vm.deal(direct_vm._contract_address, tracked_before + stray)
+
+    direct_vm.sender = direct_alice
+    with pytest.raises(Exception):
+        vault.sweep()  # not the owner
+
+    direct_vm.sender = direct_owner
+    vault.sweep()
+
+    assert vault.get_state()["prize_pool"] == pool_before + stray
+
+
+def test_sweep_fails_with_nothing_to_sweep(direct_vm, direct_deploy, direct_owner):
+    vault = _deploy(direct_vm, direct_deploy, direct_owner)
+    direct_vm.sender = direct_owner
+    with pytest.raises(Exception):
+        vault.sweep()
+
+
 def test_withdraw_creator_only_by_owner(direct_vm, direct_deploy, direct_owner, direct_alice):
     vault = _deploy(direct_vm, direct_deploy, direct_owner)
     direct_vm.mock_llm("guardian", DENY)

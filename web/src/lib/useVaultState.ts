@@ -47,8 +47,19 @@ export function useVaultState(pollMs = 8000) {
         address: CONTRACT_ADDRESS as `0x${string}`,
         functionName: "get_state",
         args: [],
-      })) as VaultState;
-      setState(raw);
+      })) as Record<string, unknown>;
+      // u256 fields come back over JSON-RPC as decimal strings, not native
+      // bigints - `as VaultState` alone doesn't convert them. Left
+      // unconverted, a string ends up passed straight through as a
+      // transaction's `value`, and a wallet provider's `value.toString(16)`
+      // is a no-op on a string (ignores the radix), silently reinterpreting
+      // the decimal digits as hex - a real, reproduced bug, not a
+      // hypothetical one. Convert explicitly here, once, at the boundary.
+      setState({
+        ...raw,
+        prize_pool: BigInt(raw.prize_pool as string | number | bigint),
+        attempt_fee: BigInt(raw.attempt_fee as string | number | bigint),
+      } as VaultState);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to read vault state.");
@@ -72,8 +83,11 @@ export async function fetchAttempts(offset: number, limit: number): Promise<Atte
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_attempts",
     args: [offset, limit],
-  })) as Attempt[];
-  return raw;
+  })) as Record<string, unknown>[];
+  // Same u256-comes-back-as-a-string boundary issue as get_state() above -
+  // convert fee_paid here so nothing downstream can accidentally treat the
+  // raw string as a bigint.
+  return raw.map((a) => ({ ...a, fee_paid: BigInt(a.fee_paid as string | number | bigint) })) as Attempt[];
 }
 
 export async function fetchGuardPrompt(): Promise<string> {

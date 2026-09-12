@@ -1,10 +1,12 @@
-// Seed the existing vault with a specific amount (in whole GEN).
-// Usage: npx tsx scripts/seed_amount.ts <gen_amount>
+// Seed the live vault with a specific amount (in whole GEN).
+// Usage: npx tsx scripts/seed_amount.ts <gen_amount> [address]
+// Defaults to NEXT_PUBLIC_CONTRACT_ADDRESS (.env.local) if no address given.
 import { createClient, createAccount } from "genlayer-js";
 import { testnetBradbury } from "genlayer-js/chains";
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
 
-const ADDRESS = "0xF0A0188599C9f9d797bceEaeeE2E451E0Eb4aFBC" as `0x${string}`;
+loadEnv({ path: ".env.local" });
+loadEnv();
 
 function safeJson(value: unknown): string {
   return JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v), 2);
@@ -12,7 +14,9 @@ function safeJson(value: unknown): string {
 
 async function main() {
   const genAmountStr = process.argv[2];
-  if (!genAmountStr) throw new Error("Usage: tsx seed_amount.ts <gen_amount>");
+  if (!genAmountStr) throw new Error("Usage: tsx seed_amount.ts <gen_amount> [address]");
+  const ADDRESS = (process.argv[3] ?? process.env.NEXT_PUBLIC_CONTRACT_ADDRESS) as `0x${string}` | undefined;
+  if (!ADDRESS) throw new Error("No address given and NEXT_PUBLIC_CONTRACT_ADDRESS not set.");
   const rawKey = process.env.DEPLOYER_PRIVATE_KEY;
   if (!rawKey) throw new Error("DEPLOYER_PRIVATE_KEY not set.");
   const privateKey = (rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`) as `0x${string}`;

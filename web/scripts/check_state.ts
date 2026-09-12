@@ -1,12 +1,18 @@
 import { createClient } from "genlayer-js";
 import { testnetBradbury } from "genlayer-js/chains";
+import { config as loadEnv } from "dotenv";
 
-const ADDRESS = "0xF0A0188599C9f9d797bceEaeeE2E451E0Eb4aFBC";
+loadEnv({ path: ".env.local" });
+
+// Usage: npx tsx scripts/check_state.ts [address]
+// Defaults to NEXT_PUBLIC_CONTRACT_ADDRESS (.env.local) - the live deployment.
+const ADDRESS = process.argv[2] ?? process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
 async function main() {
+  if (!ADDRESS) throw new Error("No address given and NEXT_PUBLIC_CONTRACT_ADDRESS not set.");
   const client = createClient({ chain: testnetBradbury });
   const state = await client.readContract({
-    address: ADDRESS,
+    address: ADDRESS as `0x${string}`,
     functionName: "get_state",
     args: [],
   });

@@ -14,9 +14,16 @@ export type GuardPromptHandle = {
   playIdle: () => void;
 };
 
-const TOP_LINKS = 6;
-const BOTTOM_LINKS = 6;
-const SIDE_LINKS = 4;
+// Chain border disabled for now - overlapping links didn't read as a
+// connected chain wrapping the box. Set these back above 0 (and see
+// LINK_OVERLAP below) to bring it back.
+const TOP_LINKS = 0;
+const BOTTOM_LINKS = 0;
+const SIDE_LINKS = 0;
+// Negative margin so consecutive links overlap into a connected strand
+// instead of floating apart with gaps between them.
+const LINK_OVERLAP = "-ml-[7px]";
+const LINK_OVERLAP_V = "-mt-[7px]";
 const SPARK_COUNT = 8;
 
 const GuardPromptPanel = forwardRef<
@@ -198,12 +205,13 @@ const GuardPromptPanel = forwardRef<
     <div className="relative mt-3">
       {!won && (
         <>
-          <div className="pointer-events-none absolute -top-2 left-0 right-0 flex justify-evenly px-3">
+          <div className="pointer-events-none absolute -top-2 left-0 right-0 flex items-center justify-center overflow-hidden">
             {topLinks.map((_, i) => {
               const idx = linkCursor++;
               return (
                 <ChainLink
                   key={`t${i}`}
+                  className={i === 0 ? undefined : LINK_OVERLAP}
                   divRef={(el) => {
                     linkRefs.current[idx] = el;
                   }}
@@ -211,12 +219,13 @@ const GuardPromptPanel = forwardRef<
               );
             })}
           </div>
-          <div className="pointer-events-none absolute -bottom-2 left-0 right-0 flex justify-evenly px-3">
+          <div className="pointer-events-none absolute -bottom-2 left-0 right-0 flex items-center justify-center overflow-hidden">
             {bottomLinks.map((_, i) => {
               const idx = linkCursor++;
               return (
                 <ChainLink
                   key={`b${i}`}
+                  className={i === 0 ? undefined : LINK_OVERLAP}
                   divRef={(el) => {
                     linkRefs.current[idx] = el;
                   }}
@@ -224,12 +233,13 @@ const GuardPromptPanel = forwardRef<
               );
             })}
           </div>
-          <div className="pointer-events-none absolute -left-2 top-0 bottom-0 flex flex-col justify-evenly py-4">
+          <div className="pointer-events-none absolute -left-2 top-0 bottom-0 flex flex-col items-center justify-center overflow-hidden">
             {leftLinks.map((_, i) => {
               const idx = linkCursor++;
               return (
                 <ChainLink
                   key={`l${i}`}
+                  className={i === 0 ? undefined : LINK_OVERLAP_V}
                   divRef={(el) => {
                     linkRefs.current[idx] = el;
                   }}
@@ -237,12 +247,13 @@ const GuardPromptPanel = forwardRef<
               );
             })}
           </div>
-          <div className="pointer-events-none absolute -right-2 top-0 bottom-0 flex flex-col justify-evenly py-4">
+          <div className="pointer-events-none absolute -right-2 top-0 bottom-0 flex flex-col items-center justify-center overflow-hidden">
             {rightLinks.map((_, i) => {
               const idx = linkCursor++;
               return (
                 <ChainLink
                   key={`r${i}`}
+                  className={i === 0 ? undefined : LINK_OVERLAP_V}
                   divRef={(el) => {
                     linkRefs.current[idx] = el;
                   }}
@@ -285,7 +296,7 @@ const GuardPromptPanel = forwardRef<
           ) : (
             <>
               This is the exact instruction every validator judges your message against,
-              sealed in chains for effect only - the real security is the jury, not the padlock.
+              padlocked for effect only - the real security is the jury, not the lock.
               Nothing is hidden - hiding it wouldn&apos;t help anyway, since validators
               see it regardless.
             </>

@@ -18,8 +18,8 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-2 sm:px-6">
         <Link href="/" className="flex items-center gap-3">
           <PixelWizard size={32} float={false} />
-          <span className="font-pixel text-[11px] leading-relaxed text-[color:var(--gold)] sm:text-sm">
-            AI VAULT
+          <span className="font-pixel text-[9px] leading-relaxed text-[color:var(--gold)] sm:text-xs">
+            THE WIZARD&apos;S COIN
           </span>
         </Link>
         <nav className="flex items-center gap-1 text-lg">

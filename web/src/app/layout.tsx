@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Vault",
+  title: "The Wizard's Coin",
   description: "A prize vault guarded by a GenLayer validator jury, not one operator's AI.",
 };
 

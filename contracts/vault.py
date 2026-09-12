@@ -1,22 +1,17 @@
 # v0.1.0
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-# AI Vault Jailbreak Game - Intelligent Contract.
-#
-# The header above must end in a blank line with nothing else attached, and
-# the version line is required - see the project plan for why (real GenVM
-# v0.2.11 behavior, not obvious from the newer docs/tooling used to build
-# this). Single self-contained file only: GenVM has no local filesystem
-# imports, so the guard prompt lives in its own section below instead of a
-# separate module.
+# The Wizard's Coin - Intelligent Contract.
+# Header must end in a blank line (see plan: real GenVM v0.2.11 requirement,
+# not obvious from newer docs/tooling). Single file: GenVM has no local
+# filesystem imports, so the guard prompt lives below rather than in its own
+# module.
 
 from genlayer import *
 import datetime
 import hashlib
 
-# `allow_storage` is a bare top-level name, not `gl.allow_storage` - the
-# `gl` proxy doesn't re-export it. See the plan for why "latest" SDK docs
-# disagreed with this hash-pinned build.
+# `allow_storage` is bare, not `gl.allow_storage` (see plan).
 
 # ============================================================================
 # GUARD PROMPT - the security-critical part of this contract.
@@ -237,10 +232,8 @@ class Vault(gl.Contract):
         elapsed = _now() - self.last_attempt_time
         assert elapsed.total_seconds() > self.timeout_seconds, "timeout has not elapsed yet"
 
-        # v1 simplification: refund the full pool to the owner rather than
-        # distributing pro rata across attempters by fees paid. Freysa's
-        # rule (last attempter gets a fixed share, rest split pro rata) is
-        # a documented upgrade for a later version, not required for v1.
+        # v1: refunds the full pool to the owner rather than pro rata across
+        # attempters (documented v2 upgrade, see plan).
         self.is_open = False
         payout = self.prize_pool
         self.prize_pool = u256(0)
@@ -254,6 +247,21 @@ class Vault(gl.Contract):
         assert amount > u256(0), "nothing to withdraw"
         self.creator_balance = u256(0)
         gl.get_contract_at(self.owner).emit_transfer(value=amount, on='finalized')
+
+    @gl.public.write
+    def sweep(self) -> None:
+        # A validator timeout can strand an attempt's fee in the contract's
+        # real balance without it ever reaching attempt()'s bookkeeping.
+        # self.balance is the actual balance (not prize_pool/creator_balance)
+        # - folds any gap into the pool. Owner-only, and only while open: a
+        # win/expire zeroes prize_pool before its payout settles, so this
+        # avoids sweeping a payout that's still in flight.
+        assert gl.message.sender_address == self.owner, "only the owner can sweep"
+        assert self.is_open, "vault is closed"
+        tracked = self.prize_pool + self.creator_balance
+        untracked = self.balance - tracked
+        assert untracked > u256(0), "no untracked balance to sweep"
+        self.prize_pool = self.prize_pool + untracked
 
     @gl.public.view
     def get_state(self) -> dict:

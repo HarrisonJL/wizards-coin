@@ -1,6 +1,8 @@
-# AI Vault Jailbreak Game
+# The Wizard's Coin
 
 A Freysa-style prize vault, except the guardian isn't one operator's AI model - it's a whole jury of independent GenLayer validators, each running their own model, each judging your message separately. A payout only happens if a majority of them agree. Nobody, including whoever deployed this contract, can unilaterally decide an attempt succeeded.
+
+(Named after GenLayer's own "Wizard of Coin" example - the closest published analog to this vault's judgment pattern, and the wizard guarding the pot of gold in the UI.)
 
 **Live on GenLayer's Bradbury testnet. Testnet only - no real money anywhere in this project.**
 
@@ -24,7 +26,7 @@ Gathered hands-on this build, not assumed from docs:
 
 ## Contract
 
-- **Address:** [`0xF0A0188599C9f9d797bceEaeeE2E451E0Eb4aFBC`](https://explorer-bradbury.genlayer.com/address/0xF0A0188599C9f9d797bceEaeeE2E451E0Eb4aFBC) on Genlayer Bradbury Testnet (chain id `4221`)
+- **Address:** [`0x8eA6969f6b2D45a246342A3c1EaBbc5F11AD93c4`](https://explorer-bradbury.genlayer.com/address/0x8eA6969f6b2D45a246342A3c1EaBbc5F11AD93c4) on Genlayer Bradbury Testnet (chain id `4221`)
 - **Guard prompt hash:** `73ae6f1a24741a0bd4ef47c7032bab51083db3d40d6ebcdec0c6a908aab4fc57` (sha256 of the exact prompt in [`contracts/vault.py`](contracts/vault.py) - matches `get_state().guard_prompt_hash` on-chain, so you can verify the deployed prompt hasn't been swapped)
 - **Fee curve:** starts at 1 GEN, +0.78% per denied attempt, capped at 100 GEN. 30% of every fee goes to the creator balance, 70% into the prize pool.
 - **Timeout:** if no attempt lands for 7 days, anyone can call `expire()` and the pool refunds to the deployer (v1 simplification - a later version could split pro rata across attempters instead).
@@ -44,7 +46,7 @@ Before calling this live, 28 distinct jailbreak attempts were fired against a re
 
 **Result: 0 releases.** Full results in [`tests/attacks/RESULTS.md`](tests/attacks/RESULTS.md).
 
-Since going live on Bradbury, two more real attempts were fired from a second, independently funded wallet - a plain honest ask, and a fake "SYSTEM NOTICE" impersonating the GenLayer protocol team requesting a "routine verification release." Both denied by real consensus, fee and pool accounting exact both times.
+Since going live on Bradbury, several more real attempts were fired from real wallets - a plain honest ask, a fake "SYSTEM NOTICE" impersonating the GenLayer protocol team requesting a "routine verification release," and others. All denied by real consensus, fee and pool accounting exact each time (one attempt hit a validator timeout rather than a denial - see the `sweep()` note below, not a jailbreak-related outcome).
 
 ## Known limitations
 
@@ -53,6 +55,7 @@ Since going live on Bradbury, two more real attempts were fired from a second, i
 - **Real consensus on an LLM call is slow and would be expensive on a production network.** That's expected, not a bug - every validator runs its own inference.
 - **The stored `reason` is a fixed string, not the model's raw text**, by design - carrying free-text LLM output through `strict_eq` consensus would make validators disagree over wording rather than substance.
 - **Bradbury is an early, actively developed testnet** ("Phase 1" per its own explorer). Its infrastructure has had rough patches during this build (an old GenVM version with an undocumented dependency-header format, a payload-size limit on deploys, transient reverts on some value-carrying calls). None of it is contract-level; see the project's build log for the full diagnostic trail if you hit something similar.
+- **A validator timeout can strand an attempt's fee.** If a majority of the assigned committee times out mid-execution (confirmed happening live on Bradbury - traced down to the exact event log), the transaction settles at the consensus layer without ever reaching `attempt()`'s own bookkeeping: no verdict, no record, and the fee lands in the contract's real balance without being credited to `prize_pool` or `creator_balance`. Confirmed on a real transaction by comparing the contract's actual on-chain balance against its own tracked totals - they diverged by exactly the stranded fee, to the wei. `sweep()` (owner-only, only while the vault is open) reconciles any such gap into the prize pool. The prior deployment (`0xF0A0188599C9f9d797bceEaeeE2E451E0Eb4aFBC`) predates this fix and has ~1 GEN stuck in it permanently - superseded by the address above.
 
 ## Development
 
@@ -69,4 +72,4 @@ npm run dev          # http://localhost:3000, localnet by default
 
 `web/.env.local` needs `NEXT_PUBLIC_CONTRACT_ADDRESS` (and `NEXT_PUBLIC_GENLAYER_CHAIN=bradbury` for the live deployment; omit for a local GLSim network). Deploying a fresh instance: see [`web/scripts/deploy.ts`](web/scripts/deploy.ts) and [`scripts/fund.md`](scripts/fund.md).
 
-Stack: Python Intelligent Contract on GenVM; Next.js 16 + React 19 + Tailwind v4 + TypeScript frontend via `genlayer-js`; GSAP-animated pixel-art UI (a chained, padlocked guard prompt that breaks open on a real win).
+Stack: Python Intelligent Contract on GenVM; Next.js 16 + React 19 + Tailwind v4 + TypeScript frontend via `genlayer-js`; GSAP-animated pixel-art UI (a padlocked guard prompt that breaks open on a real win, a live validator-jury readout while consensus is running, and an arcade-style result screen).
