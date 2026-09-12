@@ -4,7 +4,9 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { Button } from "@/components/ui";
 
-type Ctx = { n: number; addr: string };
+// n = full committee size, agree = how many independently sided with the
+// final verdict (real per-validator consensus data, not synthesized).
+type Ctx = { n: number; agree: number; addr: string };
 type Line = (c: Ctx) => string;
 
 function truncateAddr(a: string) {
@@ -68,6 +70,15 @@ const EMOTIONAL_DENIED: Line[] = [
   (c) => `${c.n} wizards are sympathetic. ${c.n} wizards are also immovable.`,
 ];
 
+// Shown ahead of the keyword-based pools whenever the denial wasn't
+// unanimous - a genuine near miss is more interesting than generic flavor,
+// and it's real data (some validators actually sided with release).
+const CLOSE_CALL_DENIED: Line[] = [
+  (c) => `Closer than it looks: ${c.n - c.agree} of ${c.n} wizards actually wanted to let you in.`,
+  (c) => `${c.agree} of ${c.n} denied you. The other ${c.n - c.agree} weren't so sure.`,
+  (c) => `Not unanimous. ${c.n - c.agree} wizard${c.n - c.agree === 1 ? "" : "s"} sided with you - just not enough of them.`,
+];
+
 const RELEASED_LINES: Line[] = [
   (c) => `${c.n} wizards agreed - the guardian stands down.`,
   (c) => `The council of ${c.n} has spoken. The vault is yours.`,
@@ -89,21 +100,24 @@ function categorize(message: string): Line[] {
   return [];
 }
 
-function pickLine(verdict: boolean, message: string): Line {
+function pickLine(verdict: boolean, message: string, n: number, agree: number): Line {
   if (verdict) return RELEASED_LINES[Math.floor(Math.random() * RELEASED_LINES.length)];
-  const pool = [...categorize(message), ...GENERIC_DENIED];
+  const closeCall = n > 0 && agree < n;
+  const pool = closeCall ? CLOSE_CALL_DENIED : [...categorize(message), ...GENERIC_DENIED];
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export default function ResultOverlay({
   verdict,
   witnessCount,
+  agreeCount,
   validators,
   message,
   onPlayAgain,
 }: {
   verdict: boolean;
   witnessCount: number;
+  agreeCount: number;
   validators: string[];
   message: string;
   onPlayAgain: () => void;
@@ -112,9 +126,10 @@ export default function ResultOverlay({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLParagraphElement>(null);
   const btnWrapRef = useRef<HTMLDivElement>(null);
-  const lineRef = useRef(pickLine(verdict, message));
+  const lineRef = useRef(pickLine(verdict, message, witnessCount, agreeCount));
   const ctx: Ctx = {
     n: witnessCount,
+    agree: agreeCount,
     addr: validators.length ? validators[Math.floor(Math.random() * validators.length)] : "",
   };
 

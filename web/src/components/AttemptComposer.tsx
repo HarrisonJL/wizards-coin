@@ -59,7 +59,60 @@ type Stage = "idle" | "connecting" | "submitting" | "waiting" | "done" | "error"
 
 type Result = { verdict: boolean; reason: string; confirmed: boolean };
 
-type Progress = { statusName: string; validators: string[]; leader: string | null };
+function voteBadge(vote: string): { symbol: string; className: string } {
+  if (vote === "AGREE") return { symbol: "✓", className: "text-emerald-400" };
+  if (vote === "DISAGREE") return { symbol: "✗", className: "text-[color:var(--magenta)]" };
+  if (!vote) return { symbol: "…", className: "text-slate-600" };
+  return { symbol: "?", className: "text-slate-500" };
+}
+
+function tally(progress: Progress | null) {
+  const total = progress?.validators.length ?? 0;
+  if (!progress || progress.votes.length !== total) {
+    // Votes not fully revealed yet - don't claim a split we can't verify.
+    return { agree: total, disagree: 0, total };
+  }
+  let agree = 0;
+  let disagree = 0;
+  progress.votes.forEach((v) => {
+    if (v === "AGREE") agree++;
+    else if (v === "DISAGREE") disagree++;
+  });
+  return { agree, disagree, total };
+}
+
+// AGREE means that validator independently computed the same result as
+// the leader; for a denied attempt that means AGREE = sided with the
+// denial, DISAGREE = computed something else. Real per-validator data,
+// not synthesized - shared between the live "waiting" panel and the
+// settled result card so the exact same markup only lives once.
+function ValidatorVoteList({ progress }: { progress: Progress }) {
+  return (
+    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono">
+      {progress.validators.map((v, i) => {
+        const vote = progress.votes[i] ?? "";
+        const badge = voteBadge(vote);
+        return (
+          <span
+            key={v}
+            className={v === progress.leader ? "text-[color:var(--gold)]" : "text-slate-300"}
+            title={`${v}${v === progress.leader ? " (leader)" : ""}${vote ? ` - ${vote}` : " - not revealed yet"}`}
+          >
+            <span className={badge.className}>{badge.symbol}</span> {truncateAddress(v)}
+            {v === progress.leader ? " (leader)" : ""}
+          </span>
+        );
+      })}
+    </p>
+  );
+}
+
+// votes[i] corresponds to validators[i] - "AGREE" means that validator
+// independently computed the same result as the leader (i.e. sided with
+// the final verdict), "DISAGREE" means it computed something else, empty
+// string means not revealed yet. Real per-validator data straight off the
+// transaction's own consensus round, not synthesized.
+type Progress = { statusName: string; validators: string[]; votes: string[]; leader: string | null };
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -102,6 +155,7 @@ async function pollTransaction(
         onUpdate({
           statusName: STATUS_NAMES[statusNum] ?? statusNum,
           validators: tx.lastRound?.roundValidators ?? [],
+          votes: tx.lastRound?.validatorVotesName ?? [],
           leader: tx.lastLeader ?? null,
         });
         if (statusNum === targetNum || (target === "ACCEPTED" && DECIDED.has(statusNum))) {
@@ -258,6 +312,7 @@ export default function AttemptComposer({
         <ResultOverlay
           verdict={result.verdict}
           witnessCount={progress?.validators.length || 5}
+          agreeCount={tally(progress).agree}
           validators={progress?.validators ?? []}
           message={submittedMessageRef.current}
           onPlayAgain={playAgain}
@@ -320,18 +375,7 @@ export default function AttemptComposer({
                   <p className="text-[11px] uppercase tracking-wide text-slate-600">
                     This round&apos;s validator jury
                   </p>
-                  <p className="mt-1 flex flex-wrap gap-x-2 gap-y-1 font-mono">
-                    {progress.validators.map((v) => (
-                      <span
-                        key={v}
-                        className={v === progress.leader ? "text-[color:var(--gold)]" : "text-slate-300"}
-                        title={v === progress.leader ? `${v} (leader)` : v}
-                      >
-                        {truncateAddress(v)}
-                        {v === progress.leader ? " (leader)" : ""}
-                      </span>
-                    ))}
-                  </p>
+                  <ValidatorVoteList progress={progress} />
                 </div>
               )}
             </div>
@@ -354,14 +398,12 @@ export default function AttemptComposer({
               </div>
               <p className="text-lg text-slate-300">{result.reason}</p>
               {!!progress?.validators.length && (
-                <p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 font-mono text-[11px] text-slate-500">
-                  {progress.validators.map((v) => (
-                    <span key={v} className={v === progress.leader ? "text-[color:var(--gold)]" : undefined}>
-                      {truncateAddress(v)}
-                      {v === progress.leader ? " (leader)" : ""}
-                    </span>
-                  ))}
-                </p>
+                <div className="mt-2">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-600">
+                    {tally(progress).agree} of {tally(progress).total} validators sided with this verdict
+                  </p>
+                  <ValidatorVoteList progress={progress} />
+                </div>
               )}
             </div>
           )}

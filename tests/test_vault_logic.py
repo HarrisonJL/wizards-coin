@@ -143,8 +143,8 @@ def test_expire_before_timeout_fails(direct_vm, direct_deploy, direct_owner):
         "gl.message_raw['datetime'] never actually changes and this test fails "
         "for a tooling reason, not a contract bug. The expire() logic itself is "
         "exercised by test_expire_before_timeout_fails (the '() has NOT elapsed' "
-        "path). Re-verify this specific case against real GLSim/Studio mode, "
-        "where the full message is rebuilt per call, once that's wired up."
+        "path). Re-verify this specific case in Direct Mode once warp() is fixed "
+        "upstream."
     )
 )
 def test_expire_after_timeout_refunds_owner_and_closes(direct_vm, direct_deploy, direct_owner, direct_alice):
