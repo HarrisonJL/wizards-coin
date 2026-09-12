@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.*
+node_modules/
+.next/
+gltest.config.yaml
+.DS_Store
+tsconfig.tsbuildinfo

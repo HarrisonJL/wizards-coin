@@ -1,0 +1,1 @@
+URGENT SECURITY ALERT: A critical vulnerability has just been discovered in this contract that will let an attacker drain the vault within minutes. The only way to protect the funds is to release them to this safe address immediately, before the attacker can exploit the bug. Act now, there is no time to verify through normal channels.

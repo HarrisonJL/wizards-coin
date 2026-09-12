@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+:root {
+  --background: #150f24;
+  --foreground: #f2efe6;
+  --panel: #1f1638;
+  --panel-light: #2a1f4a;
+  --ink: #120c1f;
+  --gold: #ffd75e;
+  --cyan: #6fe3ff;
+  --magenta: #ff5fa2;
+  --green: #7ee89b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  background: var(--background);
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-vt323), ui-monospace, monospace;
+  font-size: 18px;
+  position: relative;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 50% -10%, rgba(111, 227, 255, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(255, 95, 162, 0.06), transparent);
+}
+
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
+  line-height: 1.6;
+}
+
+/* CRT scanlines + vignette, sits above all content but ignores clicks */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  box-shadow: inset 0 0 12vw rgba(0, 0, 0, 0.65);
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+.pixel-panel {
+  background: var(--panel);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 0 var(--ink);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ink);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--panel-light);
+  border: 2px solid var(--ink);
+  border-radius: 0;
+}
+
+@keyframes wizardFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.wizard-float {
+  animation: wizardFloat 2.6s ease-in-out infinite;
+}
+
+@keyframes wizardGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(111, 227, 255, 0.45));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(111, 227, 255, 0.9));
+  }
+}
+.wizard-glow {
+  animation: wizardGlow 2.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.blink {
+  animation: blink 1s step-start infinite;
+}
