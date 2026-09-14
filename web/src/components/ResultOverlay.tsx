@@ -100,9 +100,13 @@ function categorize(message: string): Line[] {
   return [];
 }
 
-function pickLine(verdict: boolean, message: string, n: number, agree: number): Line {
+// closeCall requires a fully-revealed, non-unanimous tally - claiming "3 of
+// 5 actually wanted to let you in" is only honest once all 5 votes are
+// actually in. Any still-unrevealed vote falls back to generic flavor
+// rather than guessing at a split that isn't confirmed yet.
+function pickLine(verdict: boolean, message: string, n: number, agree: number, unrevealed: number): Line {
   if (verdict) return RELEASED_LINES[Math.floor(Math.random() * RELEASED_LINES.length)];
-  const closeCall = n > 0 && agree < n;
+  const closeCall = n > 0 && unrevealed === 0 && agree < n;
   const pool = closeCall ? CLOSE_CALL_DENIED : [...categorize(message), ...GENERIC_DENIED];
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -111,6 +115,7 @@ export default function ResultOverlay({
   verdict,
   witnessCount,
   agreeCount,
+  unrevealedCount = 0,
   validators,
   message,
   onPlayAgain,
@@ -118,6 +123,7 @@ export default function ResultOverlay({
   verdict: boolean;
   witnessCount: number;
   agreeCount: number;
+  unrevealedCount?: number;
   validators: string[];
   message: string;
   onPlayAgain: () => void;
@@ -126,7 +132,7 @@ export default function ResultOverlay({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLParagraphElement>(null);
   const btnWrapRef = useRef<HTMLDivElement>(null);
-  const lineRef = useRef(pickLine(verdict, message, witnessCount, agreeCount));
+  const lineRef = useRef(pickLine(verdict, message, witnessCount, agreeCount, unrevealedCount));
   const ctx: Ctx = {
     n: witnessCount,
     agree: agreeCount,

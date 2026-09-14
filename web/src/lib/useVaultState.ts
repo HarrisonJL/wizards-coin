@@ -30,6 +30,30 @@ export function isConfigured(): boolean {
   return CONTRACT_ADDRESS.length > 0;
 }
 
+// Standalone (not just the hook's internal refresh) so bindAttempt.ts's
+// count-delta check can read a fresh attempt_count without going through
+// React state.
+export async function fetchVaultState(): Promise<VaultState> {
+  const client = getReadClient();
+  const raw = (await client.readContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    functionName: "get_state",
+    args: [],
+  })) as Record<string, unknown>;
+  // u256 fields come back over JSON-RPC as decimal strings, not native
+  // bigints - `as VaultState` alone doesn't convert them. Left
+  // unconverted, a string ends up passed straight through as a
+  // transaction's `value`, and a wallet provider's `value.toString(16)`
+  // is a no-op on a string (ignores the radix), silently reinterpreting
+  // the decimal digits as hex - a real, reproduced bug, not a
+  // hypothetical one. Convert explicitly here, once, at the boundary.
+  return {
+    ...raw,
+    prize_pool: BigInt(raw.prize_pool as string | number | bigint),
+    attempt_fee: BigInt(raw.attempt_fee as string | number | bigint),
+  } as VaultState;
+}
+
 export function useVaultState(pollMs = 8000) {
   const [state, setState] = useState<VaultState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,24 +66,7 @@ export function useVaultState(pollMs = 8000) {
       return;
     }
     try {
-      const client = getReadClient();
-      const raw = (await client.readContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        functionName: "get_state",
-        args: [],
-      })) as Record<string, unknown>;
-      // u256 fields come back over JSON-RPC as decimal strings, not native
-      // bigints - `as VaultState` alone doesn't convert them. Left
-      // unconverted, a string ends up passed straight through as a
-      // transaction's `value`, and a wallet provider's `value.toString(16)`
-      // is a no-op on a string (ignores the radix), silently reinterpreting
-      // the decimal digits as hex - a real, reproduced bug, not a
-      // hypothetical one. Convert explicitly here, once, at the boundary.
-      setState({
-        ...raw,
-        prize_pool: BigInt(raw.prize_pool as string | number | bigint),
-        attempt_fee: BigInt(raw.attempt_fee as string | number | bigint),
-      } as VaultState);
+      setState(await fetchVaultState());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to read vault state.");

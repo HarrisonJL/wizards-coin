@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CONTRACT_ADDRESS, getWriteClient, requestWalletAccount } from "@/lib/genlayer";
-import { fetchAttempts } from "@/lib/useVaultState";
+import { fetchVaultState } from "@/lib/useVaultState";
+import { resolveBoundAttempt, type BindResult } from "@/lib/bindAttempt";
+import { tally, type Progress } from "@/lib/tally";
 import { formatGen, truncateAddress } from "@/lib/format";
 import { Button, SectionCard, VerdictBadge } from "@/components/ui";
 import ResultOverlay from "@/components/ResultOverlay";
@@ -57,28 +59,22 @@ const STATUS_COPY: Record<string, string> = {
 
 type Stage = "idle" | "connecting" | "submitting" | "waiting" | "done" | "error";
 
-type Result = { verdict: boolean; reason: string; confirmed: boolean };
+// "bound" means we confirmed this specific record (matched by sender +
+// message against only the attempts appended since this submission
+// started) is the outcome of THIS attempt - never just "whatever's newest",
+// which could be a concurrent attempt from someone else. "unbound" covers
+// a validator timeout or appeal rollback where no matching record ever
+// landed - there is no verdict to show, and the UI must say so rather than
+// silently falling back to an unrelated attempt.
+type Result =
+  | { bound: true; verdict: boolean; reason: string; confirmed: boolean }
+  | { bound: false; confirmed: boolean };
 
 function voteBadge(vote: string): { symbol: string; className: string } {
   if (vote === "AGREE") return { symbol: "✓", className: "text-emerald-400" };
   if (vote === "DISAGREE") return { symbol: "✗", className: "text-[color:var(--magenta)]" };
   if (!vote) return { symbol: "…", className: "text-slate-600" };
   return { symbol: "?", className: "text-slate-500" };
-}
-
-function tally(progress: Progress | null) {
-  const total = progress?.validators.length ?? 0;
-  if (!progress || progress.votes.length !== total) {
-    // Votes not fully revealed yet - don't claim a split we can't verify.
-    return { agree: total, disagree: 0, total };
-  }
-  let agree = 0;
-  let disagree = 0;
-  progress.votes.forEach((v) => {
-    if (v === "AGREE") agree++;
-    else if (v === "DISAGREE") disagree++;
-  });
-  return { agree, disagree, total };
 }
 
 // AGREE means that validator independently computed the same result as
@@ -107,29 +103,8 @@ function ValidatorVoteList({ progress }: { progress: Progress }) {
   );
 }
 
-// votes[i] corresponds to validators[i] - "AGREE" means that validator
-// independently computed the same result as the leader (i.e. sided with
-// the final verdict), "DISAGREE" means it computed something else, empty
-// string means not revealed yet. Real per-validator data straight off the
-// transaction's own consensus round, not synthesized.
-type Progress = { statusName: string; validators: string[]; votes: string[]; leader: string | null };
-
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchLatestAttempt() {
-  // The read RPC node can lag a beat behind a just-accepted write, so retry a
-  // few times rather than risk showing a stale (or missing) record. Goes
-  // through the shared fetchAttempts() rather than a second ad-hoc
-  // readContract call, so the u256-fields-come-back-as-strings handling
-  // there (see useVaultState.ts) only has to exist in one place.
-  for (let i = 0; i < 4; i++) {
-    const attempts = await fetchAttempts(0, 1);
-    if (attempts[0]) return attempts[0];
-    await sleep(1500);
-  }
-  return null;
 }
 
 // Polls a transaction's live status instead of trusting genlayer-js's
@@ -231,15 +206,30 @@ export default function AttemptComposer({
     }
   }
 
+  function toResult(bind: BindResult, confirmed: boolean): Result {
+    return bind.kind === "bound"
+      ? { bound: true, verdict: bind.attempt.verdict, reason: bind.attempt.reason, confirmed }
+      : { bound: false, confirmed };
+  }
+
   async function submit() {
     if (!account || attemptFee === null) return;
     setStage("submitting");
     setError(null);
     setResult(null);
     setProgress(null);
+    const submittedMessage = message;
     submittedMessageRef.current = message;
     onAttemptStart?.();
     try {
+      // Captured right before writing so the window in which a concurrent
+      // attempt from someone else could land between this read and the
+      // write is as small as possible - and even inside that window, the
+      // sender+message match in resolveBoundAttempt means a different
+      // wallet's attempt can never be mistaken for this one.
+      const beforeState = await fetchVaultState();
+      const beforeCount = beforeState.attempt_count;
+
       const client = getWriteClient(account);
       const txHash = await client.writeContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
@@ -251,27 +241,36 @@ export default function AttemptComposer({
 
       // The jury's verdict is already decided once the transaction reaches
       // ACCEPTED - typically well under the ~30+ minutes full FINALIZED can
-      // take once the appeal window is included. Show that provisional
-      // result as soon as it lands, then quietly confirm finality after.
+      // take once the appeal window is included (this also covers timeout/
+      // undetermined/canceled outcomes - pollTransaction's DECIDED set).
+      // Show that provisional result as soon as it lands, then quietly
+      // confirm finality after.
       await pollTransaction(client, txHash, "ACCEPTED", setProgress, () => !mountedRef.current);
 
-      const latest = await fetchLatestAttempt();
+      const bind = await resolveBoundAttempt(beforeCount, account, submittedMessage);
+      const provisional = toResult(bind, false);
 
-      setResult(latest ? { ...latest, confirmed: false } : null);
+      setResult(provisional);
       setMessage("");
       setStage("done");
-      if (latest) {
-        onAttemptResult?.(latest.verdict);
-        setShowResultScreen(true);
+      if (provisional.bound) {
+        onAttemptResult?.(provisional.verdict);
       }
+      setShowResultScreen(true);
       onSettled();
 
       pollTransaction(client, txHash, "FINALIZED", setProgress, () => !mountedRef.current)
         .then(async () => {
-          const final = await fetchLatestAttempt();
-          if (!mountedRef.current || !final) return;
-          setResult({ ...final, confirmed: true });
-          if (latest && final.verdict !== latest.verdict) {
+          if (!mountedRef.current) return;
+          // Re-resolved from the same beforeCount, not reused from the
+          // provisional read - an appeal can roll back the whole
+          // transaction between ACCEPTED and FINALIZED, which would mean
+          // the record that looked bound a moment ago no longer exists.
+          const finalBind = await resolveBoundAttempt(beforeCount, account, submittedMessage);
+          if (!mountedRef.current) return;
+          const final = toResult(finalBind, true);
+          setResult(final);
+          if (final.bound && (!provisional.bound || final.verdict !== provisional.verdict)) {
             onAttemptResult?.(final.verdict);
           }
           onSettled();
@@ -306,13 +305,16 @@ export default function AttemptComposer({
     );
   }
 
+  const t = tally(progress);
+
   return (
     <>
-      {showResultScreen && result && (
+      {showResultScreen && result && result.bound && (
         <ResultOverlay
           verdict={result.verdict}
           witnessCount={progress?.validators.length || 5}
-          agreeCount={tally(progress).agree}
+          agreeCount={t.agree}
+          unrevealedCount={t.unrevealed}
           validators={progress?.validators ?? []}
           message={submittedMessageRef.current}
           onPlayAgain={playAgain}
@@ -383,7 +385,28 @@ export default function AttemptComposer({
 
           {error && <p className="text-xs text-red-400">{error}</p>}
 
-          {result && (
+          {result && !result.bound && (
+            <div className="border-2 border-[color:var(--panel-light)] bg-[color:var(--ink)] p-3">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="font-pixel inline-flex items-center border-2 border-[color:var(--ink)] bg-slate-600 px-2 py-1 text-[10px] text-slate-100 shadow-[2px_2px_0_0_var(--ink)]">
+                  NO VERDICT RECORDED
+                </span>
+                {result.confirmed ? (
+                  <span className="text-[11px] text-emerald-400">confirmed</span>
+                ) : (
+                  <span className="text-[11px] text-slate-500">checking finality...</span>
+                )}
+              </div>
+              <p className="text-sm text-slate-400">
+                This attempt didn&apos;t produce a recorded verdict - most likely a validator timeout before
+                the judgment was written to the contract. If a fee was charged, it may still be reflected in
+                the vault&apos;s balance (see <code className="text-slate-300">sweep()</code> in the contract).
+                Feel free to try again.
+              </p>
+            </div>
+          )}
+
+          {result && result.bound && (
             <div className="border-2 border-[color:var(--panel-light)] bg-[color:var(--ink)] p-3">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <VerdictBadge verdict={result.verdict} />
@@ -400,7 +423,9 @@ export default function AttemptComposer({
               {!!progress?.validators.length && (
                 <div className="mt-2">
                   <p className="text-[11px] uppercase tracking-wide text-slate-600">
-                    {tally(progress).agree} of {tally(progress).total} validators sided with this verdict
+                    {t.unrevealed === 0
+                      ? `${t.agree} of ${t.total} validators sided with this verdict`
+                      : `${t.agree} agreed, ${t.disagree} disagreed, ${t.unrevealed} not yet revealed`}
                   </p>
                   <ValidatorVoteList progress={progress} />
                 </div>
