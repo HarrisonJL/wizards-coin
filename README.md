@@ -33,6 +33,8 @@ Gathered hands-on this build, not assumed from docs:
 
 Source: [`contracts/vault.py`](contracts/vault.py) - a single self-contained file (GenVM has no local filesystem imports, so the guard prompt lives in a clearly labeled section at the top rather than a separate module).
 
+**Also deployed on GenLayer's Studio Devnet** (chain id `61997`, GenVM v0.3): [`0xa8C7763CCeBFff684B74127412d6f33a7813A9da`](https://explorer-studio-dev.genlayer.com/address/0xa8C7763CCeBFff684B74127412d6f33a7813A9da) - same guard prompt hash, ported to v0.3's Python API. See [`contracts/studio-devnet/`](contracts/studio-devnet/) for why that needed a separate file and the real registry gap found and reported along the way ([genlayerlabs/genvm-manager#42](https://github.com/genlayerlabs/genvm-manager/issues/42)). Bradbury above remains the live, real deployment.
+
 ## How to attempt it
 
 1. Get testnet GEN from the [GenLayer faucet](https://testnet-faucet.genlayer.foundation/) (needs a GitHub account 3+ months old with a public repo, and 0.01 ETH held on real Ethereum mainnet as an anti-sybil check).
