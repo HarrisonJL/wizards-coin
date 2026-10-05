@@ -2,8 +2,21 @@
 
 A port of [`../vault.py`](../vault.py) to GenVM v0.3's Python API, deployed to GenLayer's Studio Devnet (chain id `61997`) to satisfy a submission requirement for a deployment on that network. **The real, live app stays on Bradbury** - see the project root README. This is not a second production deployment; it exists so the same guard prompt and contract logic can be independently verified on Studio Devnet too.
 
-- **Address:** [`0xa8C7763CCeBFff684B74127412d6f33a7813A9da`](https://explorer-studio-dev.genlayer.com/address/0xa8C7763CCeBFff684B74127412d6f33a7813A9da) on GenLayer Studio Devnet (chain id `61997`)
+- **Address:** [`0x1A9Cf94D262c7cE897d5316652541039c741A3bB`](https://explorer-studio-dev.genlayer.com/address/0x1A9Cf94D262c7cE897d5316652541039c741A3bB) on GenLayer Studio Devnet (chain id `61997`)
+- **Deploy tx:** `0xe5da11fa2c7e6775479e64b3310937a04d567c437004008ade7a0eef534c1ecf`
 - **Guard prompt hash:** `73ae6f1a24741a0bd4ef47c7032bab51083db3d40d6ebcdec0c6a908aab4fc57` - identical to the Bradbury deployment's, confirmed via `get_state().guard_prompt_hash` on-chain. Same guardian, same rule, different network.
+
+## Verify the deployed source matches this repo
+
+The on-chain code at `0x1A9Cf94D262c7cE897d5316652541039c741A3bB`, fetched from the chain itself with `gen_getContractCode`, is byte-identical to [`vault.py`](vault.py) in this folder (SHA-256 `517dd79168edcf7a28e97e4c2b052773d16e10e58007939cbaf241e7b11fe201`, 10274 chars):
+
+```bash
+npm install
+npx tsx verify_code.ts 0x1A9Cf94D262c7cE897d5316652541039c741A3bB vault.py     # IDENTICAL
+CHAIN=bradbury npx tsx verify_code.ts 0x8eA6969f6b2D45a246342A3c1EaBbc5F11AD93c4 ../vault.py   # the Bradbury deployment vs ../vault.py: IDENTICAL (SHA-256 f17678631396db323642755454888c94b0d0815d5499f969637e9453683fee48)
+```
+
+**Superseded deployment.** An earlier deployment of the same source, `0xa8C7763CCeBFff684B74127412d6f33a7813A9da`, still answers view calls, but the chain's code-fetch API returns "contract code not found" for it, so its source could not be proven to match this repo. It was redeployed; **do not use the old address to evaluate the contract.**
 
 ## Why a separate file, not a flag on the real contract
 

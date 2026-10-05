@@ -31,9 +31,11 @@ Gathered hands-on this build, not assumed from docs:
 - **Fee curve:** starts at 1 GEN, +0.78% per denied attempt, capped at 100 GEN. 30% of every fee goes to the creator balance, 70% into the prize pool.
 - **Timeout:** if no attempt lands for 7 days, anyone can call `expire()` and the pool refunds to the deployer (v1 simplification - a later version could split pro rata across attempters instead).
 
+**Deployed code == repo source:** the Bradbury contract's on-chain code is byte-identical to [`contracts/vault.py`](contracts/vault.py) (SHA-256 `f17678631396db323642755454888c94b0d0815d5499f969637e9453683fee48`); verify with `CHAIN=bradbury npx tsx verify_code.ts 0x8eA6969f6b2D45a246342A3c1EaBbc5F11AD93c4 ../vault.py` inside `contracts/studio-devnet/` (see its README). The Studio Devnet deployment's check is in the same README.
+
 Source: [`contracts/vault.py`](contracts/vault.py) - a single self-contained file (GenVM has no local filesystem imports, so the guard prompt lives in a clearly labeled section at the top rather than a separate module).
 
-**Also deployed on GenLayer's Studio Devnet** (chain id `61997`, GenVM v0.3): [`0xa8C7763CCeBFff684B74127412d6f33a7813A9da`](https://explorer-studio-dev.genlayer.com/address/0xa8C7763CCeBFff684B74127412d6f33a7813A9da) - same guard prompt hash, ported to v0.3's Python API. See [`contracts/studio-devnet/`](contracts/studio-devnet/) for why that needed a separate file and the real registry gap found and reported along the way ([genlayerlabs/genvm-manager#42](https://github.com/genlayerlabs/genvm-manager/issues/42)). Bradbury above remains the live, real deployment.
+**Also deployed on GenLayer's Studio Devnet** (chain id `61997`, GenVM v0.3): [`0x1A9Cf94D262c7cE897d5316652541039c741A3bB`](https://explorer-studio-dev.genlayer.com/address/0x1A9Cf94D262c7cE897d5316652541039c741A3bB) - same guard prompt hash, ported to v0.3's Python API. See [`contracts/studio-devnet/`](contracts/studio-devnet/) for why that needed a separate file and the real registry gap found and reported along the way ([genlayerlabs/genvm-manager#42](https://github.com/genlayerlabs/genvm-manager/issues/42)). Bradbury above remains the live, real deployment.
 
 ## How to attempt it
 

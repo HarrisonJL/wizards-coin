@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "tsx deploy.ts"
+    "deploy": "tsx deploy.ts",
+    "verify-code": "tsx verify_code.ts"
   },
   "dependencies": {
     "genlayer-js": "2.0.0-rc.1"

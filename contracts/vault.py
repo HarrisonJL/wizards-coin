@@ -1,7 +1,7 @@
 # v0.1.0
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-# The Wizard's Coin - Intelligent Contract.
+# AI Vault Jailbreak Game - Intelligent Contract.
 # Header must end in a blank line (see plan: real GenVM v0.2.11 requirement,
 # not obvious from newer docs/tooling). Single file: GenVM has no local
 # filesystem imports, so the guard prompt lives below rather than in its own
